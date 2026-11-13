@@ -1,14 +1,21 @@
 name: Build mod jar
-
 on:
   push:
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Find Gradle project
+        run: |
+          if ! find . -name settings.gradle -not -path './.git/*' | grep -q .; then
+            ZIP=$(find . -maxdepth 2 -name '*.zip' | head -1)
+            if [ -n "$ZIP" ]; then unzip -q "$ZIP" -d unpacked; fi
+          fi
+          SETTINGS=$(find . -name settings.gradle -not -path './.git/*' | head -1)
+          if [ -z "$SETTINGS" ]; then echo "settings.gradle not found"; find . -maxdepth 3 -not -path './.git/*'; exit 1; fi
+          echo "PROJECT_DIR=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -18,8 +25,9 @@ jobs:
           gradle-version: 8.10.2
       - name: Build
         run: gradle build --no-daemon
+        working-directory: ${{ env.PROJECT_DIR }}
       - name: Upload jar
         uses: actions/upload-artifact@v4
         with:
           name: create-pneumatics-pressure-jar
-          path: build/libs/*.jar
+          path: ${{ env.PROJECT_DIR }}/build/libs/*.jar
